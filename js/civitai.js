@@ -831,7 +831,7 @@ function openLocalDetail(m, grid, filterIn) {
   var isNsfw = (m.nsfw || (m.nsfwLevel || 0) > 1) && window.__nsfwBlurEnabled !== false;
 
   // Gallery of all local preview images
-  var previewEl = el("img", { style: { width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block", borderRadius:"var(--civ-radius-sm)", background:"#141414", marginBottom:"6px" } });
+  var previewEl = el("img", { style: { width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block", borderRadius:"var(--civ-radius-sm)", background:"#141414", marginBottom:"6px", maxHeight:"35vh" } });
   if (isNsfw) {
     previewEl.style.filter = "blur(20px) grayscale(0.5)";
     previewEl.addEventListener("mouseenter", function() { this.style.filter = "none"; });
@@ -1591,10 +1591,21 @@ function _buildLocalUI(pane, data) {
   pane.appendChild(header);
 
   // Filter row
-  var filterRow = el("div", { class: "cvt-row", style: { marginBottom:"8px" } });
-  var filterIn = el("input", { type: "text", placeholder: "Filter models\u2026", style: { flex:"1" } });
+  var filterRow = el("div", { class: "cvt-row", style: { marginBottom:"8px", flexWrap:"wrap" } });
+  var filterIn = el("input", { type: "text", placeholder: "Filter models\u2026", style: { flex:"1", minWidth:"100px" } });
   filterRow.appendChild(filterIn);
+  var scanBtn = el("button", { class: "cvt-btn ghost", style: { padding:"3px 8px", fontSize:"10px" } }, "\uD83D\uDD0D Scan");
+  var tagBtn = el("button", { class: "cvt-btn ghost", style: { padding:"3px 8px", fontSize:"10px" } }, "\uD83C\uDFF7 Tag");
+  var cleanBtn = el("button", { class: "cvt-btn ghost", style: { padding:"3px 8px", fontSize:"10px" } }, "\uD83E\uDDF9 Clean");
+  var orgBtn = el("button", { class: "cvt-btn ghost", style: { padding:"3px 8px", fontSize:"10px" } }, "\uD83D\uDCC2 Org");
+  var expBtn = el("button", { class: "cvt-btn ghost", style: { padding:"3px 8px", fontSize:"10px" } }, "\uD83D\uDCCB Export");
+  filterRow.appendChild(scanBtn); filterRow.appendChild(tagBtn); filterRow.appendChild(cleanBtn); filterRow.appendChild(orgBtn); filterRow.appendChild(expBtn);
   pane.appendChild(filterRow);
+  scanBtn.onclick = function() { renderLocal(pane, true); };
+  tagBtn.onclick = function() { _api("/civitai/auto-tag", { method:"POST", body:"{}" }).then(function() { _toast("Auto-tag complete"); }).catch(function(e) { _toast("Tag error: " + e.message, "error"); }); };
+  cleanBtn.onclick = function() { _api("/civitai/cleanup-scan", { method:"POST" }).then(function(r) { _toast("Found " + (r.issues||[]).length + " issues"); }).catch(function(e) { _toast("Cleanup error: " + e.message, "error"); }); };
+  orgBtn.onclick = function() { _api("/civitai/auto-organize", { method:"POST" }).then(function(r) { _toast("Organized " + (r.moved||0) + " files"); renderLocal(pane, true); }).catch(function(e) { _toast("Organize error: " + e.message, "error"); }); };
+  expBtn.onclick = function() { _api("/civitai/export-list").then(function(r) { if(r.text){ navigator.clipboard.writeText(r.text).then(function() { _toast("Copied " + (r.count||0) + " paths"); }); } }).catch(function(e) { _toast("Export error: " + e.message, "error"); }); };
 
   // Grid container
   var grid = el("div", { class: "cvt-grid", id: "cvt-local-grid" });
@@ -1744,11 +1755,29 @@ function renderSettings(pane) {
   var baseGroup = el("div", { class: "group" });
   baseGroup.appendChild(el("label", {}, "Base URL"));
   var baseSel = el("select");
-  ["civitai.com", "civitai.red"].forEach(function(b) {
+  ["civitai.com", "civitai.red", "civitai.work"].forEach(function(b) {
     baseSel.appendChild(el("option", { value: b }, b));
   });
   baseGroup.appendChild(baseSel);
   s.appendChild(baseGroup);
+
+  // ---- Quick Actions ----
+  var qaGroup = el("div", { class: "group" });
+  qaGroup.appendChild(el("label", {}, "Quick Actions"));
+  var qaRow = el("div", { class: "cvt-row", style: { marginTop:"8px", flexWrap:"wrap" } });
+  s.appendChild(qaGroup);
+  qaGroup.appendChild(qaRow);
+  [
+    ["\uD83C\uDFF7 Auto-Tag", function() { _api("/civitai/auto-tag", { method:"POST", body:"{}" }).then(function() { _toast("Auto-tag complete"); }).catch(function(e) { _toast("Tag error: " + e.message, "error"); }); }],
+    ["\uD83E\uDDF9 Cleanup", function() { _api("/civitai/cleanup-scan", { method:"POST" }).then(function(r) { _toast("Found " + (r.issues||[]).length + " issues"); }).catch(function(e) { _toast("Cleanup error: " + e.message, "error"); }); }],
+    ["\uD83D\uDCC2 Organize", function() { _api("/civitai/auto-organize", { method:"POST" }).then(function(r) { _toast("Organized " + (r.moved||0) + " files"); }).catch(function(e) { _toast("Organize error: " + e.message, "error"); }); }],
+    ["\uD83D\uDCCB Export", function() { _api("/civitai/export-list").then(function(r) { if(r.text){ navigator.clipboard.writeText(r.text).then(function() { _toast("Copied " + (r.count||0) + " paths"); }); } }).catch(function(e) { _toast("Export error: " + e.message, "error"); }); }],
+    ["\uD83D\uDD0D Rescan", function() { _api("/civitai/rescan", { method:"POST", body:JSON.stringify({force:true}) }).then(function() { _toast("Rescanned"); }).catch(function(e) { _toast("Rescan error: " + e.message, "error"); }); }],
+  ].forEach(function(a) {
+    var btn = el("button", { class: "cvt-btn ghost", style: { padding:"5px 12px", fontSize:"11px" } }, a[0]);
+    btn.onclick = a[1];
+    qaRow.appendChild(btn);
+  });
 
   // ---- Action buttons ----
   var saveBtn = el("button", { class: "cvt-btn cvt-btn-xs" }, "\u2714\uFE0F Save");
@@ -1851,7 +1880,7 @@ function renderSettings(pane) {
     saveBtn.disabled = true;
     sStatus.textContent = "Saving\u2026";
     var body = {
-      network_choice: baseSel.value === "civitai.red" ? "red" : baseSel.value === "civitai.com" ? "com" : baseSel.value,
+      network_choice: baseSel.value === "civitai.red" ? "red" : baseSel.value === "civitai.work" ? "work" : "com",
       save_metadata: cbMeta.checked,
       save_preview: cbPrev.checked,
       verify_sha256: cbHash.checked,
