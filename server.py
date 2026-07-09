@@ -301,20 +301,24 @@ async def start_download(request):
         if not download_url:
             return web.json_response({"error": "Missing url or model_version_id"}, status=400)
 
-        # Resolve "auto" folder — fetch version info to determine type
+        loop = asyncio.get_event_loop()
+
+        # Resolve "auto" folder — fetch version info to determine type (async)
         if not model_type or model_type == "auto":
             try:
-                vi = utils.CivitaiAPIUtils.get_model_version_info_by_id(
-                    int(model_version_id), domain
-                ) if model_version_id else None
-                if vi:
-                    civitai_type = (vi.get("model") or {}).get("type", "")
-                    model_type = {
-                        "Checkpoint": "checkpoints", "LORA": "loras", "LoCon": "loras",
-                        "DoRA": "loras", "VAE": "vae", "Controlnet": "controlnet",
-                        "TextualInversion": "embeddings", "Hypernetwork": "hypernetworks",
-                        "Upscaler": "upscale_models", "MotionModule": "animatediff_models",
-                    }.get(civitai_type, "other")
+                if model_version_id:
+                    vi = await loop.run_in_executor(
+                        None, utils.CivitaiAPIUtils.get_model_version_info_by_id,
+                        int(model_version_id), domain
+                    )
+                    if vi:
+                        civitai_type = (vi.get("model") or {}).get("type", "")
+                        model_type = {
+                            "Checkpoint": "checkpoints", "LORA": "loras", "LoCon": "loras",
+                            "DoRA": "loras", "VAE": "vae", "Controlnet": "controlnet",
+                            "TextualInversion": "embeddings", "Hypernetwork": "hypernetworks",
+                            "Upscaler": "upscale_models", "MotionModule": "animatediff_models",
+                        }.get(civitai_type, "other")
             except Exception:
                 model_type = "loras"
 

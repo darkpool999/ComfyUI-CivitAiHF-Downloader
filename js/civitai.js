@@ -1371,7 +1371,14 @@ function renderHF(pane) {
 
 function _lookupHF(raw, fieldEl) {
   var v = (raw || "").trim();
-  if (!v || v.indexOf("/") < 0) { _toast("Enter a repo in format: user/repo", "error"); return; }
+  if (!v) { _toast("Enter a repo in format: user/repo or paste a HuggingFace URL", "error"); return; }
+  // Parse full HF URLs: https://huggingface.co/user/repo/tree/main
+  var urlMatch = v.match(/huggingface\.co\/([\w.-]+\/[\w.-]+)/);
+  if (urlMatch) v = urlMatch[1];
+  // Strip trailing /tree/main or other path parts
+  v = v.replace(/\/(tree|blob|resolve|blame|commits|discussions|files)\/.*$/, "");
+  v = v.replace(/\/+$/, "");
+  if (v.indexOf("/") < 0) { _toast("Enter a repo in format: user/repo", "error"); return; }
   if (fieldEl) fieldEl.disabled = true;
   _api("/civitai/hf-lookup?repo=" + encodeURIComponent(v)).then(function(data) {
     if (data && data.id) {
