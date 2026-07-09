@@ -382,6 +382,7 @@ select option { background: #111; color: #f0f0f0; }
 .cvt-modal .left, .cvt-modal .right {
   padding: 14px 16px;
   min-height: 0;
+  max-height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 }
