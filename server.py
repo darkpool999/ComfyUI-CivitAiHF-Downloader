@@ -897,7 +897,11 @@ async def save_settings(request):
             utils.db_manager.set_setting("compute_sha", data["verify_sha256"])
         if "hf_token" in data:
             utils.db_manager.set_setting("hf_token", data["hf_token"])
-        return web.json_response({"success": True})
+        return web.json_response({
+            "success": True,
+            "has_api_key": bool(utils.db_manager.get_setting("civitai_api_key")),
+            "has_token": bool(utils.db_manager.get_setting("hf_token")),
+        })
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
@@ -1102,7 +1106,11 @@ async def ping(request):
     domain = utils._get_active_domain()
     try:
         r = requests.get(f"https://{domain}/api/v1/models?limit=1", timeout=10)
-        return web.json_response({"ok": r.ok, "status": r.status_code, "domain": domain})
+        return web.json_response({
+            "ok": r.ok, "status": r.status_code, "domain": domain,
+            "has_api_key": bool(utils.db_manager.get_setting("civitai_api_key")),
+            "has_token": bool(utils.db_manager.get_setting("hf_token")),
+        })
     except Exception as e:
         return web.json_response({"ok": False, "error": str(e), "domain": domain})
 

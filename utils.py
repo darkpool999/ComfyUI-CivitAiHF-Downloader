@@ -109,11 +109,15 @@ class DatabaseManager:
         return default
 
     def set_setting(self, key, value):
-        with self.get_connection() as conn:
+        conn = self.get_connection()
+        try:
             conn.execute(
                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
                 (key, json.dumps(value)),
             )
+            conn.commit()
+        finally:
+            conn.close()
 
     def get_analysis_cache(self, fingerprint):
         with self.get_connection() as conn:
