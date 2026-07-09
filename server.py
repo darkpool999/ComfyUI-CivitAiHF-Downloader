@@ -838,6 +838,10 @@ async def get_settings(request):
         "hfToken": bool(utils.db_manager.get_setting("hf_token")),
         "network_choice": utils.db_manager.get_setting("network_choice", "com"),
         "nsfw_blur": utils.db_manager.get_setting("nsfw_blur", True),
+        "theme": utils.db_manager.get_setting("theme", "dark"),
+        "compact_grid": utils.db_manager.get_setting("compact_grid", False),
+        "has_api_key": bool(utils.db_manager.get_setting("civitai_api_key")),
+        "has_token": bool(utils.db_manager.get_setting("hf_token")),
     })
 
 
@@ -847,12 +851,16 @@ async def save_settings(request):
         data = await request.json()
         for key in [
             "save_metadata", "save_preview", "compute_sha", "nsfw_default",
-            "network_choice", "nsfw_blur",
+            "network_choice", "nsfw_blur", "theme", "compact_grid",
         ]:
             if key in data:
                 utils.db_manager.set_setting(key, data[key])
         if "civitai_api_key" in data:
             utils.db_manager.set_setting("civitai_api_key", data["civitai_api_key"])
+        if "api_key" in data:
+            utils.db_manager.set_setting("civitai_api_key", data["api_key"])
+        if "verify_sha256" in data:
+            utils.db_manager.set_setting("compute_sha", data["verify_sha256"])
         if "hf_token" in data:
             utils.db_manager.set_setting("hf_token", data["hf_token"])
         return web.json_response({"success": True})
@@ -1127,3 +1135,30 @@ async def get_local_previews(request):
 
 
 print("[ComfyUI-CivitAiHF-Downloader] Extra routes registered")
+
+
+# ── Prompt Fetcher (node ↔ UI bridge) ──────────────────────────────────
+
+@routes.post("/civitai/prompt-fetcher")
+async def set_prompt_fetcher(request):
+    """Receive positive/negative prompts from the UI and store for the Prompt Fetcher node."""
+    try:
+        body = await request.json()
+        positive = body.get("positive", "")
+        negative = body.get("negative", "")
+        from .nodes import set_prompts
+        set_prompts(positive, negative)
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
+@routes.get("/civitai/prompt-fetcher")
+async def get_prompt_fetcher(request):
+    """Return the current prompts stored in the Prompt Fetcher node."""
+    try:
+        from .nodes import get_prompts
+        prompts = get_prompts()
+        return web.json_response(prompts)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)

@@ -1019,6 +1019,20 @@ function openLocalDetail(m, grid, filterIn) {
           if (metaParts.length) {
             pArea.appendChild(el("div", { style: { fontSize:"9px", opacity:".6", marginTop:"2px" } }, metaParts.join(" \u00B7 ")));
           }
+          // "Use in workflow" button for local detail gallery
+          if (prompt || negPrompt) {
+            var localUseBtn = el("button", { class: "cvt-btn", style: { marginTop:"6px", width:"100%", fontSize:"11px" } }, "\u26A1 Use in workflow");
+            localUseBtn.onclick = function(e) {
+              e.stopPropagation();
+              _api("/civitai/prompt-fetcher", {
+                method: "POST",
+                body: JSON.stringify({ positive: prompt || "", negative: negPrompt || "" })
+              }).then(function() {
+                _toast("\u26A1 Prompts sent to Prompt Fetcher node!", "ok");
+              }).catch(function(err) { _toast("Failed: " + err.message, "error"); });
+            };
+            pArea.appendChild(localUseBtn);
+          }
           if (!prompt && !negPrompt && !metaParts.length) {
             pArea.appendChild(el("div", { style: { color:"var(--civ-text-mute)", fontSize:"10px" } }, "No generation data for this image"));
           }
@@ -1279,8 +1293,14 @@ function openLightbox(img, model) {
       var useBtn = el("button", { class: "cvt-btn", style: { marginTop:"14px", width:"100%" } }, "\u26A1 Use in workflow");
       useBtn.onclick = function(e) {
         e.stopPropagation();
-        var text = "POSITIVE:\n" + meta.prompt + "\n\nNEGATIVE:\n" + (meta.negativePrompt || "") + "\n\nSettings: Steps=" + (meta.steps || "?") + ", CFG=" + (meta.cfgScale || "?") + ", Sampler=" + (meta.sampler || "?") + ", Seed=" + (meta.seed || "?");
-        navigator.clipboard.writeText(text).then(function() { _toast("Prompt + settings copied! Paste into your workflow.", "ok", 4000); });
+        _api("/civitai/prompt-fetcher", {
+          method: "POST",
+          body: JSON.stringify({ positive: meta.prompt || "", negative: meta.negativePrompt || "" })
+        }).then(function() {
+          _toast("\u26A1 Prompts sent to Prompt Fetcher node! Run your workflow to use them.", "ok");
+        }).catch(function(err) {
+          _toast("Failed: " + err.message, "error");
+        });
       };
       panel.appendChild(useBtn);
     }
