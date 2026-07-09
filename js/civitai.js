@@ -1726,14 +1726,12 @@ function _buildLocalUI(pane, data) {
   var tagBtn = el("button", { class: "cvt-btn ghost", style: { padding:"3px 8px", fontSize:"10px" } }, "\uD83C\uDFF7 Tag");
   var cleanBtn = el("button", { class: "cvt-btn ghost", style: { padding:"3px 8px", fontSize:"10px" } }, "\uD83E\uDDF9 Clean");
   var orgBtn = el("button", { class: "cvt-btn ghost", style: { padding:"3px 8px", fontSize:"10px" } }, "\uD83D\uDCC2 Org");
-  var expBtn = el("button", { class: "cvt-btn ghost", style: { padding:"3px 8px", fontSize:"10px" } }, "\uD83D\uDCCB Export");
-  filterRow.appendChild(scanBtn); filterRow.appendChild(tagBtn); filterRow.appendChild(cleanBtn); filterRow.appendChild(orgBtn); filterRow.appendChild(expBtn);
+  filterRow.appendChild(scanBtn); filterRow.appendChild(tagBtn); filterRow.appendChild(cleanBtn); filterRow.appendChild(orgBtn);
   pane.appendChild(filterRow);
   scanBtn.onclick = function() { renderLocal(pane, true); };
   tagBtn.onclick = function() { _api("/civitai/auto-tag", { method:"POST", body:"{}" }).then(function() { _toast("Auto-tag complete"); }).catch(function(e) { _toast("Tag error: " + e.message, "error"); }); };
   cleanBtn.onclick = function() { _api("/civitai/cleanup-scan", { method:"POST" }).then(function(r) { _toast("Found " + (r.issues||[]).length + " issues"); }).catch(function(e) { _toast("Cleanup error: " + e.message, "error"); }); };
   orgBtn.onclick = function() { _api("/civitai/auto-organize", { method:"POST" }).then(function(r) { _toast("Organized " + (r.moved||0) + " files"); renderLocal(pane, true); }).catch(function(e) { _toast("Organize error: " + e.message, "error"); }); };
-  expBtn.onclick = function() { _api("/civitai/export-list").then(function(r) { if(r.text){ navigator.clipboard.writeText(r.text).then(function() { _toast("Copied " + (r.count||0) + " paths"); }); } }).catch(function(e) { _toast("Export error: " + e.message, "error"); }); };
 
   // Grid container
   var grid = el("div", { class: "cvt-grid", id: "cvt-local-grid" });
@@ -1912,7 +1910,6 @@ function renderSettings(pane) {
   [["\uD83C\uDFF7 Auto-Tag","Tag all models with Civitai metadata",function(){_api("/civitai/auto-tag",{method:"POST",body:"{}"}).then(function(){_toast("Auto-tag complete")}).catch(function(e){_toast("Error: "+e.message,"error")})}],
    ["\uD83E\uDDF9 Cleanup","Find orphan files and invalid metadata",function(){_api("/civitai/cleanup-scan",{method:"POST"}).then(function(r){_toast("Found "+(r.issues||[]).length+" issues")}).catch(function(e){_toast("Error: "+e.message,"error")})}],
    ["\uD83D\uDCC2 Organize","Auto-sort models into subfolders",function(){_api("/civitai/auto-organize",{method:"POST"}).then(function(r){_toast("Organized "+(r.moved||0)+" files");renderLocal(pane,true)}).catch(function(e){_toast("Error: "+e.message,"error")})}],
-   ["\uD83D\uDCCB Export","Copy all model paths to clipboard",function(){_api("/civitai/export-list").then(function(r){if(r.text)navigator.clipboard.writeText(r.text).then(function(){_toast("Copied "+(r.count||0)+" paths")})}).catch(function(e){_toast("Error: "+e.message,"error")})}],
    ["\uD83D\uDD0D Rescan","Force re-scan all model folders",function(){_api("/civitai/rescan",{method:"POST",body:JSON.stringify({force:true})}).then(function(){_toast("Rescanned")}).catch(function(e){_toast("Error: "+e.message,"error")})}]].forEach(function(a){
     var card = el("div",{class:"cvt-settings-action-card",onclick:a[2]});
     card.appendChild(el("div",{class:"cvt-settings-action-title"},a[0]));
