@@ -64,7 +64,7 @@
 
 2. Clone this repository:
    ```bash
-   git clone https://github.com/darkpool999/ComfyUI-CivitAiHF-Downloader.git
+   git clone https://github.com/Darkdevworker/ComfyUI-CivitAiHF-Downloader.git
    ```
 
 3. Install Python dependencies:
