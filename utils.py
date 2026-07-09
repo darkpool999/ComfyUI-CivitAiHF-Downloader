@@ -31,6 +31,19 @@ SUPPORTED_MODEL_TYPES = {
     "photomaker": "photomaker",
     "style_models": "style_models",
     "wildcards": "wildcards",
+    "audio_encoders": "audio_encoders",
+    "background_removal": "background_removal",
+    "clip": "clip",
+    "configs": "configs",
+    "detection": "detection",
+    "diffusers": "diffusers",
+    "frame_interpolation": "frame_interpolation",
+    "geometry_estimation": "geometry_estimation",
+    "gligen": "gligen",
+    "latent_upscale_models": "latent_upscale_models",
+    "model_patches": "model_patches",
+    "optical_flow": "optical_flow",
+    "vae_approx": "vae_approx",
 }
 
 

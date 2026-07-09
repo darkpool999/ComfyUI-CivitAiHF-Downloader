@@ -1026,7 +1026,11 @@ async def list_folders(request):
         for sub in ["checkpoints", "loras", "vae", "controlnet", "embeddings",
                      "upscale_models", "clip_vision", "unet", "diffusion_models",
                      "instantid", "ipadapter", "photomaker", "style_models",
-                     "text_encoders", "wildcards"]:
+                     "text_encoders", "wildcards", "audio_encoders",
+                     "background_removal", "clip", "configs", "detection",
+                     "diffusers", "frame_interpolation", "geometry_estimation",
+                     "gligen", "latent_upscale_models", "model_patches",
+                     "optical_flow", "vae_approx"]:
             sub_path = os.path.join(folder_paths.models_dir, sub)
             if os.path.isdir(sub_path):
                 folders.append(sub)
