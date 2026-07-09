@@ -14,6 +14,26 @@ from server import PromptServer
 
 from . import utils
 
+# ── Response cache for API calls ──────────────────────────────────────
+_api_cache = {}
+_API_CACHE_TTL = 120  # seconds
+
+def _cached_api_get(key, fetch_fn, ttl=None):
+    """Cache API responses to avoid repeated slow calls."""
+    ttl = ttl or _API_CACHE_TTL
+    now = time.time()
+    if key in _api_cache:
+        entry = _api_cache[key]
+        if now - entry["t"] < ttl:
+            return entry["v"]
+    result = fetch_fn()
+    _api_cache[key] = {"v": result, "t": now}
+    if len(_api_cache) > 200:
+        oldest = sorted(_api_cache.keys(), key=lambda k: _api_cache[k]["t"])[:50]
+        for k in oldest:
+            del _api_cache[k]
+    return result
+
 routes = PromptServer.instance.routes
 
 
@@ -58,9 +78,12 @@ async def search_civitai(request):
         if tag:
             params["tag"] = tag
 
-        resp = utils.CivitaiAPIUtils._request_with_retry(
-            f"https://{domain}/api/v1/models", params=params
-        )
+        loop = asyncio.get_event_loop()
+        def _fetch_search():
+            return utils.CivitaiAPIUtils._request_with_retry(
+                f"https://{domain}/api/v1/models", params=params
+            )
+        resp = await loop.run_in_executor(None, _fetch_search)
         data = resp.json()
         return web.json_response(data)
     except Exception as e:
@@ -232,8 +255,11 @@ async def model_versions(request):
         if not model_id:
             return web.json_response({"error": "Missing id"}, status=400)
         domain = utils._get_active_domain()
-        resp = utils.CivitaiAPIUtils._request_with_retry(
-            f"https://{domain}/api/v1/models/{model_id}"
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None, lambda: utils.CivitaiAPIUtils._request_with_retry(
+                f"https://{domain}/api/v1/models/{model_id}"
+            )
         )
         data = resp.json()
         versions = data.get("modelVersions", [])
@@ -267,8 +293,11 @@ async def model_images(request):
         page = int(request.query.get("page", 1))
         domain = utils._get_active_domain()
         params = {"modelVersionId": version_id, "limit": 100, "page": page}
-        resp = utils.CivitaiAPIUtils._request_with_retry(
-            f"https://{domain}/api/v1/images", params=params
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None, lambda: utils.CivitaiAPIUtils._request_with_retry(
+                f"https://{domain}/api/v1/images", params=params
+            )
         )
         return web.json_response(resp.json())
     except Exception as e:
@@ -825,7 +854,10 @@ async def hf_search(request):
         token = utils.db_manager.get_setting("hf_token", "")
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        resp = requests.get(hf_url, params=params, timeout=15, headers=headers)
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None, lambda: requests.get(hf_url, params=params, timeout=15, headers=headers)
+        )
         resp.raise_for_status()
         items = resp.json()
         return web.json_response({"items": items, "total": len(items)})
@@ -846,7 +878,10 @@ async def hf_lookup(request):
         if token:
             headers["Authorization"] = f"Bearer {token}"
         api_url = f"https://huggingface.co/api/models/{repo_id}"
-        resp = requests.get(api_url, timeout=15, headers=headers)
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None, lambda: requests.get(api_url, timeout=15, headers=headers)
+        )
         resp.raise_for_status()
         data = resp.json()
         return web.json_response(data)
@@ -872,7 +907,10 @@ async def hf_files(request):
         token = utils.db_manager.get_setting("hf_token", "")
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        resp = requests.get(api_url, timeout=15, headers=headers)
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None, lambda: requests.get(api_url, timeout=15, headers=headers)
+        )
         resp.raise_for_status()
         return web.json_response(resp.json())
     except Exception as e:
@@ -932,7 +970,9 @@ async def test_api(request):
     try:
         domain = utils._get_active_domain()
         t0 = time.time()
-        utils.CivitaiAPIUtils._request_with_retry(f"https://{domain}/api/v1/models?limit=1")
+        await loop.run_in_executor(
+            None, lambda: utils.CivitaiAPIUtils._request_with_retry(f"https://{domain}/api/v1/models?limit=1")
+        )
         latency = int((time.time() - t0) * 1000)
         return web.json_response({"success": True, "latency": latency})
     except Exception as e:
@@ -944,9 +984,11 @@ async def test_hf(request):
     try:
         t0 = time.time()
         headers = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(
-            "https://huggingface.co/api/models?limit=1",
-            timeout=10, headers=headers,
+        resp = await loop.run_in_executor(
+            None, lambda: requests.get(
+                "https://huggingface.co/api/models?limit=1",
+                timeout=10, headers=headers,
+            )
         )
         resp.raise_for_status()
         latency = int((time.time() - t0) * 1000)
@@ -1130,7 +1172,10 @@ async def set_hf_token(request):
 async def ping(request):
     domain = utils._get_active_domain()
     try:
-        r = requests.get(f"https://{domain}/api/v1/models?limit=1", timeout=10)
+        loop = asyncio.get_event_loop()
+        r = await loop.run_in_executor(
+            None, lambda: requests.get(f"https://{domain}/api/v1/models?limit=1", timeout=10)
+        )
         return web.json_response({
             "ok": r.ok, "status": r.status_code, "domain": domain,
             "has_api_key": bool(utils.db_manager.get_setting("civitai_api_key")),
@@ -1202,6 +1247,39 @@ async def get_local_previews(request):
 
 
 print("[ComfyUI-CivitAiHF-Downloader] Extra routes registered")
+
+
+# ── Lazy metadata loading for local models ─────────────────────────
+
+@routes.get("/civitai/local-metadata")
+async def get_local_metadata(request):
+    """Load .civitai.json metadata for a specific local model (lazy load)."""
+    try:
+        path = request.query.get("path", "")
+        if not path or ".." in path:
+            return web.json_response({"metadata": {}})
+        if not os.path.isabs(path):
+            path = os.path.join(folder_paths.models_dir, path)
+        loop = asyncio.get_event_loop()
+        metadata = await loop.run_in_executor(None, _load_sidecar, path)
+        return web.json_response({"metadata": metadata})
+    except Exception as e:
+        return web.json_response({"metadata": {}, "error": str(e)})
+
+
+def _load_sidecar(path):
+    """Load .civitai.json sidecar for a model file."""
+    base = os.path.splitext(path)[0]
+    for ext in [""] + ["." + e for e in ["safetensors","ckpt","pt","pth","bin","gguf"]]:
+        json_path = base + ".civitai.json"
+        if os.path.isfile(json_path):
+            try:
+                with open(json_path) as f:
+                    return json.load(f)
+            except Exception:
+                pass
+            break
+    return {}
 
 
 # ── Prompt Fetcher (node ↔ UI bridge) ──────────────────────────────────

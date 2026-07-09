@@ -1051,23 +1051,9 @@ def scan_local_models_direct():
                     if os.path.isfile(pf):
                         preview = pf
 
-                # Load metadata sidecar (lightweight — only read small parts)
+                # Skip JSON parsing during scan — metadata loads lazily on detail view
                 metadata = {}
-                json_path = full_path.replace(".safetensors", ".civitai.json")
-                if not os.path.isfile(json_path):
-                    for alt_ext in [".ckpt", ".pt", ".pth", ".bin", ".gguf"]:
-                        json_path = full_path.replace(alt_ext, ".civitai.json")
-                        if os.path.isfile(json_path):
-                            break
-                if os.path.isfile(json_path):
-                    try:
-                        with open(json_path) as f:
-                            raw = f.read(8192)
-                        if '"model"' in raw or '"modelId"' in raw:
-                            with open(json_path) as f:
-                                metadata = json.load(f)
-                    except Exception:
-                        pass
+                has_json = os.path.isfile(full_path.replace(".safetensors", ".civitai.json"))
 
                 nsfw = False
                 tags = []
@@ -1076,28 +1062,6 @@ def scan_local_models_direct():
                 fhash = ""
                 model_id = ""
                 base_model = ""
-                if metadata:
-                    nsfw = metadata.get("nsfw", False) or metadata.get("model", {}).get("nsfw", False)
-                    if not nsfw:
-                        versions = metadata.get("model", {}).get("modelVersions", [metadata])
-                        if versions and isinstance(versions[0], dict):
-                            nsfw = versions[0].get("nsfw", False)
-                    tags = metadata.get("model", {}).get("tags", [])
-                    if not tags and "tags" in metadata:
-                        tags = metadata["tags"] if isinstance(metadata["tags"], list) else []
-                    description = metadata.get("model", {}).get("description", "") or metadata.get("description", "")
-                    _creator = metadata.get("model", {}).get("creator", {})
-                    if isinstance(_creator, dict):
-                        creator = _creator.get("username", _creator.get("name", ""))
-                    elif isinstance(_creator, str):
-                        creator = _creator
-                    fhash = metadata.get("hashes", {}).get("SHA256", "")
-                    if not fhash:
-                        versions = metadata.get("model", {}).get("modelVersions", [metadata])
-                        if versions and isinstance(versions[0], dict):
-                            fhash = versions[0].get("hashes", {}).get("SHA256", "")
-                    model_id = metadata.get("modelId", "") or metadata.get("model", {}).get("id", "")
-                    base_model = metadata.get("baseModel", "")
 
                 result.append({
                     "name": name,
@@ -1113,7 +1077,7 @@ def scan_local_models_direct():
                     "creator": creator,
                     "tags": tags,
                     "description": description[:500] if description else "",
-                    "hasCivitai": bool(fhash),
+                    "hasCivitai": has_json,
                     "civitai": None,
                     "model_id": model_id or None,
                 })
