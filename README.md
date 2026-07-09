@@ -1,112 +1,172 @@
-# ComfyUI-CivitAiHF-Downloader
+# ComfyUI CivitAI + Hugging Face Downloader
 
-A ComfyUI custom node extension for browsing, searching, and downloading models from **Civitai** and **Hugging Face** directly within the ComfyUI interface.
+<p align="center">
+  <strong>Browse, search, preview, and download models from Civitai and Hugging Face — directly inside ComfyUI.</strong>
+</p>
 
-## Features
+<p align="center">
+  <img src="https://img.shields.io/badge/ComfyUI-Extension-blue?logo=data:image/svg+xml;base64,..." alt="ComfyUI">
+  <img src="https://img.shields.io/badge/Python-3.8+-green?logo=python" alt="Python">
+  <img src="https://img.shields.io/badge/License-GPL--3.0-yellow" alt="GPL-3.0">
+</p>
 
-### Civitai Integration
-- **Search & Browse** — Search Civitai models by query, type, sort order, time period, and base model
-- **Cursor-based pagination** — Browse through results with next/previous navigation
-- **NSFW Filtering** — Per-level rating checkboxes (PG, PG13, R, X, XXX) with client-side strict filtering and blur toggle
-- **Detail Modal** — View model info, description, stats (likes/downloads), version selector, and gallery images with prompt/negative prompt display
-- **Direct Download** — Download any model version with configurable metadata saving (.civitai.json, preview images)
-- **Lookup** — Resolve any Civitai URL, model ID, version ID, SHA256 hash, or AIR identifier
+---
 
-### Hugging Face Integration
-- Search models by query, pipeline tag, library, author, and sort order
-- Display model info including total weight file size from sibling files
-- Download models directly
+## ✨ Features
 
-### Local Model Management
-- Browse locally downloaded models with search filter
-- 2-column grid display with hover preview (prompt/negative prompt from cached `/civitai/local-previews`)
-- Detail modal with large preview image and horizontal thumbnail strip
-- Metadata viewing for locally saved models
+### 🔍 Browse & Search
+- **Civitai** — Search by query, model type, sort order, time period, base model, and NSFW rating
+- **Hugging Face** — Search by pipeline tag, library, author, and sort order
+- **Lookup** — Resolve any Civitai URL, model ID, version ID, or SHA256 hash
+- **Cursor pagination** — Browse through results with next/previous navigation
 
-### Downloads Panel
-- Real-time progress tracking for active downloads
-- Completed download history
+### 📥 Downloads
+- **One-click download** with configurable folder, subfolder, and filename
+- **Real-time progress** — speed, percentage, downloaded/total size
+- **SHA256 hash always saved** — every downloaded model gets its hash stored in `.civitai.json`
+- **Metadata & preview images** — optionally save alongside models
+- **Batch downloads** from both Civitai and Hugging Face
 
-### Settings
-- Toggle between `civitai.com`, `civitai.red`, and `civitai.work` domains
-- Enable/disable metadata and preview image saving
-- Toggle NSFW blur
-- Compute SHA256 on download
-- Configure Civitai API key and Hugging Face token
+### 📂 Local Model Manager
+- **Auto-scan** all 29 ComfyUI model folder types
+- **Card grid** with preview images, model type, base model, and size
+- **Detail modal** — gallery, Civitai lookup, tags, description, copy path, delete
+- **Disk usage display** — total model count and storage size in header
+- **Filter** by name, type, or base model
 
-## Installation
+### ⚡ Prompt Fetcher Node
+- **Single ComfyUI graph node** with two outputs: `positive_prompt` and `negative_prompt`
+- **⚡ Use in workflow** button in the lightbox sends prompts directly to the node
+- Add the node to your workflow → click Use in workflow → run
+
+### 🎨 UI/UX
+- **Dark & Light themes** — toggle via ☀️/🌙 button in the top-right corner
+- **Keyboard navigation** — `/` search, `←→↑↓` navigate cards, `Enter` opens, `Esc` closes, `1-5` switch tabs, `?` shows all shortcuts
+- **Compact grid mode** — toggle via Settings or `Ctrl+C` for denser card layout
+- **Comprehensive animations** — staggered card entrances, shimmer hover effects, spring physics, smooth transitions throughout
+- **NSFW blur** — blurred previews with hover-to-reveal
+- **Responsive** — adapts to narrow sidebar widths
+
+### ⚙️ Settings
+- **API Keys** — Civitai API key and Hugging Face token with status badges (● connected / ● not set)
+- **Preferences** — save metadata, save previews, verify SHA256, NSFW blur, compact grid
+- **Network** — switch between `civitai.com`, `civitai.red`, `civitai.work` domains
+- **Quick Actions** — Auto-Tag, Cleanup, Organize, Rescan with one-click cards
+
+---
+
+## 📦 Installation
 
 1. Navigate to your ComfyUI `custom_nodes` directory:
    ```bash
    cd ComfyUI/custom_nodes
    ```
-2. Clone the repository:
+
+2. Clone this repository:
    ```bash
    git clone https://github.com/darkpool999/ComfyUI-CivitAiHF-Downloader.git
    ```
+
 3. Install Python dependencies:
    ```bash
-   pip install requests
+   pip install -r ComfyUI-CivitAiHF-Downloader/requirements.txt
    ```
+
 4. Restart ComfyUI
 
-## Usage
+> **Note:** The extension registers a **CivitAI+HF** tab in the ComfyUI sidebar. No additional configuration is needed — it works out of the box for public models.
 
-After installation, a **CivitAI** tab appears in the ComfyUI sidebar with five sub-tabs:
+---
 
-| Tab | Description |
-|-----|-------------|
-| **CivitAI** | Search and browse Civitai models, lookup by URL/ID/hash, filter by type/rating, download |
-| **Hugging Face** | Search Hugging Face models by pipeline, library, or author |
-| **Downloads** | View active and completed download progress |
-| **Local** | Browse downloaded models with previews and metadata |
-| **Settings** | Configure domain, API keys, download options, and NSFW blur |
+## 🚀 Quick Start
 
-### Quick Start
+1. Open the **CivitAI** tab in the ComfyUI sidebar
+2. Type a search query (or leave empty for top models)
+3. Select filters: model type, sort order, time period, base model, NSFW rating
+4. Click **Search** (or press `Enter`)
+5. Click any model card → select version → click **Download**
+6. Switch to the **Local** tab to see your downloaded models
 
-1. Open the **CivitAI** tab
-2. Type a search query (or leave empty to browse latest)
-3. Select model type, sort order, and time period
-4. Choose NSFW rating filters (PG/PG13/R/X/XXX)
-5. Click **Search** (or press Enter)
-6. Click any model card to open the detail modal
-7. Select a version and click **Download**
+### Using the Prompt Fetcher
 
-### Lookup
+1. Add the **Prompt Fetcher** node to your ComfyUI workflow
+2. Connect `positive_prompt` → your positive CLIP text encoder
+3. Connect `negative_prompt` → your negative CLIP text encoder
+4. Browse models → open a preview image → click **⚡ Use in workflow**
+5. Run your workflow — the node outputs the stored prompts
 
-Paste any of the following into the lookup field at the top of the CivitAI tab:
-- Civitai model URL (e.g., `https://civitai.com/models/12345`)
-- Numeric model or version ID
-- SHA256 hash
-- AIR identifier (urn:air:...)
+---
 
-## Files
+## ⌨️ Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `/` | Focus search bar |
+| `←` `→` `↑` `↓` | Navigate between cards |
+| `Enter` | Open model detail |
+| `Esc` | Close modal / lightbox |
+| `1` `2` `3` `4` `5` | Switch tabs |
+| `Ctrl+C` | Toggle compact grid |
+| `?` | Show shortcuts help |
+
+---
+
+## 🗂 Supported Model Folders
+
+All 29 ComfyUI model folder types are supported:
+
+```
+audio_encoders    clip_vision       diffusers           geometry_estimation    loras            style_models     vae
+background_removal configs          diffusion_models    gligen                 model_patches    text_encoders    vae_approx
+checkpoints       controlnet        embeddings          hypernetworks          optical_flow     unet
+clip              detection         frame_interpolation latent_upscale_models  photomaker       upscale_models
+```
+
+---
+
+## 📁 Project Structure
 
 | File | Purpose |
 |------|---------|
-| `__init__.py` | Extension entry point, registers `WEB_DIRECTORY` |
-| `server.py` | All API endpoints (search, lookup, download, local management, settings) |
-| `utils.py` | Database manager, Civitai API utilities, hash/version extraction |
-| `js/civitai.js` | Full sidebar UI (tabs, modals, lightbox, downloads, settings, pagination) |
-| `js/civitai.css` | Noir Premium dark theme with glassmorphism effects |
+| `__init__.py` | Extension entry point, registers sidebar tab |
+| `nodes.py` | **Prompt Fetcher** graph node |
+| `nodes_display.py` | Markdown Presenter node |
+| `server.py` | All API endpoints (search, download, local management, settings, prompt fetcher) |
+| `utils.py` | Database manager, Civitai/HF API utilities, hash computation, model scanning |
+| `js/civitai.js` | Full sidebar UI (tabs, modals, lightbox, downloads, settings, keyboard nav, animations) |
+| `js/civitai.css` | Dark/Light theme with animations, glassmorphism, responsive layout |
 
-## API Endpoints
+---
 
-- `GET /civitai/search` — Search Civitai models
-- `GET /civitai/lookup` — Lookup model/version by hash, URL, or ID
-- `GET /civitai/model/{id}` — Fetch model data (updates stats)
-- `POST /civitai/download` — Download a model version
-- `GET /civitai/downloads` — List active/completed downloads
-- `DELETE /civitai/downloads/{id}` — Cancel or remove a download
-- `GET /civitai/local` — List locally downloaded models
-- `GET /civitai/local-previews` — Get cached previews for local models
-- `GET /civitai/local-preview` — Serve local preview image
-- `GET /civitai/local-detail` — Get local model detail
-- `GET /civitai/local-metadata` — Get local model metadata
-- `POST /civitai/settings` — Save settings
-- `GET /civitai/settings` — Load settings
-- `POST /civitai/scan-local` — Scan for local models
+## 🔌 API Endpoints
 
-## License
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/civitai/search` | Search Civitai models |
+| `GET` | `/civitai/lookup` | Lookup by hash, URL, or ID |
+| `GET` | `/civitai/model/{id}` | Fetch full model data |
+| `POST` | `/civitai/download` | Start a download |
+| `GET` | `/civitai/downloads` | List active/completed downloads |
+| `POST` | `/civitai/download-cancel` | Cancel a download |
+| `GET` | `/civitai/local-models` | List locally downloaded models |
+| `GET` | `/civitai/local-previews` | Get preview images for a model |
+| `GET` | `/civitai/local-preview` | Serve a resized preview image |
+| `POST` | `/civitai/delete-model` | Delete a local model |
+| `GET` | `/civitai/hf-search` | Search Hugging Face models |
+| `GET` | `/civitai/hf-files` | List files in a HF repo |
+| `POST` | `/civitai/hf/download` | Download from Hugging Face |
+| `POST` | `/civitai/prompt-fetcher` | Send prompts to Prompt Fetcher node |
+| `GET` | `/civitai/prompt-fetcher` | Get current stored prompts |
+| `GET` | `/civitai/settings` | Load settings |
+| `POST` | `/civitai/settings` | Save settings |
+| `POST` | `/civitai/auto-tag` | Tag models with Civitai metadata |
+| `POST` | `/civitai/cleanup-scan` | Find orphan files |
+| `POST` | `/civitai/auto-organize` | Sort models into subfolders |
+| `POST` | `/civitai/rescan` | Force re-scan model folders |
+| `GET` | `/civitai/ping` | Test API connection |
 
-MIT
+---
+
+## 📄 License
+
+GPL-3.0 — see [LICENSE](LICENSE) for details.
