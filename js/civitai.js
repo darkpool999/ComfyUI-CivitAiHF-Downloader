@@ -149,6 +149,7 @@ var _activeJobs = 0;
 var _jobsTimer = null;
 var _hintTimer = null;
 var _localPromptCache = {};
+window.__nsfwBlurEnabled = true;
 
 var S = {
   curTab: "civitai", civitai: { items: [], query: "", type: "", sort: "Highest Rated", nsfw: "", period: "AllTime", baseModel: "", loading: false,

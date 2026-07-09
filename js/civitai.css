@@ -707,6 +707,8 @@ select option { background: #111; color: #f0f0f0; }
 
 /* ── NSFW blur ───────────────────────────────────────────────────── */
 .cvt-nsfw-blur img { filter: blur(20px) grayscale(0.5); transition: filter .2s; }
+img.nsfw { filter: blur(20px) grayscale(0.5); transition: filter .2s; cursor: pointer; }
+img.nsfw:hover { filter: none; }
 
 /* ── Flash hint ──────────────────────────────────────────────────── */
 .cvt-flash {
