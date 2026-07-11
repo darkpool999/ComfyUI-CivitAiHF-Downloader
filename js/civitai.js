@@ -171,11 +171,9 @@ function _api(path, opts) {
     var pending = _cache._inflight.get(cacheKey);
     if (pending) return pending;
   }
-  var p = api.fetchApi(path, opts || {}).then(async function(r) {
+  var p = api.fetchApi(path, opts || {}).then(function(r) {
     if (!r.ok) {
-      var msg = "HTTP " + r.status;
-      try { var body = await r.json(); if (body && body.error) msg = body.error; } catch(e) {}
-      var err = new Error(msg);
+      var err = new Error("HTTP " + r.status);
       err.status = r.status;
       err.transient = [408, 425, 429, 500, 502, 503, 504].indexOf(r.status) >= 0;
       throw err;
@@ -187,24 +185,6 @@ function _api(path, opts) {
   });
   if (cacheKey) { _cache._inflight.set(cacheKey, p); p.then(function() { _cache._inflight.delete(cacheKey); }, function() { _cache._inflight.delete(cacheKey); }); }
   return p;
-}
-function _sanitizeHTML(html) {
-  // Strip dangerous tags/attributes, keep safe formatting
-  if (!html) return "";
-  var div = document.createElement("div");
-  div.innerHTML = html;
-  // Remove script/style/iframe/object/embed
-  div.querySelectorAll("script,style,iframe,object,embed,form,input,textarea,button,select,link,meta").forEach(function(el) { el.remove(); });
-  // Remove event handlers from all elements
-  div.querySelectorAll("*").forEach(function(el) {
-    for (var i = el.attributes.length - 1; i >= 0; i--) {
-      var attr = el.attributes[i];
-      if (attr.name.startsWith("on") || (attr.name === "href" && attr.value.startsWith("javascript:"))) {
-        el.removeAttribute(attr.name);
-      }
-    }
-  });
-  return div.innerHTML;
 }
 
 function _fmtBytes(n) { if (!n) return "\u2014"; const u = ["B","KB","MB","GB","TB"]; let i = 0; let s = n; while (s >= 1024 && i < 4) { s /= 1024; i++; } return s.toFixed(i > 1 ? 1 : 0) + " " + u[i]; }
@@ -2001,6 +1981,7 @@ function renderSettings(pane) {
 }
 
 // ── 6. MOUNT ─────────────────────────────────────────────────────────
+try {
 app.registerExtension({
   name: "CivitaiHF.Browser",
   setup: function() {
@@ -2014,7 +1995,12 @@ app.registerExtension({
           type: "custom",
           render: function(root) {
             root.innerHTML = "";
-            root.appendChild(buildUI());
+            try {
+              root.appendChild(buildUI());
+            } catch(e) {
+              console.error("[CivitaiHF] buildUI error:", e);
+              root.innerHTML = "<div style='color:#f88;padding:20px;font-size:12px;'>Extension error: " + e.message + "<br>Check browser console (F12) for details.</div>";
+            }
           },
         });
         return true;
@@ -2041,3 +2027,4 @@ app.registerExtension({
     }, 2000);
   },
 });
+} catch(initErr) { console.error("[CivitaiHF] Init error:", initErr); }
