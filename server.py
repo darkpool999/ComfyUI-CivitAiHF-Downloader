@@ -4,6 +4,7 @@ import os
 import time
 import re
 import shutil
+import threading
 import urllib.request
 import urllib.parse
 import hashlib
@@ -578,7 +579,6 @@ async def cancel_download(request):
 
 # ── Local Models ──────────────────────────────────────────────────────
 
-import threading
 _local_models_cache = {"data": None, "time": 0}
 _local_cache_lock = threading.Lock()
 _LOCAL_CACHE_TTL = 30  # seconds

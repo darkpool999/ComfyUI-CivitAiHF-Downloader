@@ -171,15 +171,14 @@ function _api(path, opts) {
     var pending = _cache._inflight.get(cacheKey);
     if (pending) return pending;
   }
-  var p = api.fetchApi(path, opts || {}).then(function(r) {
+  var p = api.fetchApi(path, opts || {}).then(async function(r) {
     if (!r.ok) {
-      return r.json().catch(function(){return {};}).then(function(body) {
-        var msg = (body && body.error) ? body.error : ("HTTP " + r.status);
-        var err = new Error(msg);
-        err.status = r.status;
-        err.transient = [408, 425, 429, 500, 502, 503, 504].indexOf(r.status) >= 0;
-        throw err;
-      });
+      var msg = "HTTP " + r.status;
+      try { var body = await r.json(); if (body && body.error) msg = body.error; } catch(e) {}
+      var err = new Error(msg);
+      err.status = r.status;
+      err.transient = [408, 425, 429, 500, 502, 503, 504].indexOf(r.status) >= 0;
+      throw err;
     }
     return r.json().catch(function() { return {}; });
   }).then(function(json) {
