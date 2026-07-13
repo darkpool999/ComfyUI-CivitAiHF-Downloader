@@ -1444,17 +1444,26 @@ function renderHF(pane) {
 function _lookupHF(raw, fieldEl) {
   var v = (raw || "").trim();
   if (!v) { _toast("Enter a repo in format: user/repo or paste a HuggingFace URL", "error"); return; }
-  // Parse full HF URLs: https://huggingface.co/user/repo/tree/main
-  var urlMatch = v.match(/huggingface\.co\/([\w.-]+\/[\w.-]+)/);
-  if (urlMatch) v = urlMatch[1];
+  // Parse full HF URLs incl. datasets/spaces: https://huggingface.co/datasets/user/repo/tree/main
+  var m = v.match(/huggingface\.co\/(.+)$/);
+  if (m) v = m[1];
+  v = v.replace(/^\/+/, "");
+  var repoType = "model";
+  var tm = v.match(/^(datasets|spaces|models)\/(.+)$/);
+  if (tm) {
+    repoType = { datasets: "dataset", spaces: "space", models: "model" }[tm[1]];
+    v = tm[2];
+  }
   // Strip trailing /tree/main or other path parts
   v = v.replace(/\/(tree|blob|resolve|blame|commits|discussions|files)\/.*$/, "");
   v = v.replace(/\/+$/, "");
+  var vp = v.split("/").filter(Boolean);
+  if (vp.length >= 2) v = vp[0] + "/" + vp[1];
   if (v.indexOf("/") < 0) { _toast("Enter a repo in format: user/repo", "error"); return; }
   if (fieldEl) fieldEl.disabled = true;
   _api("/civitai/hf-lookup?repo=" + encodeURIComponent(v)).then(function(data) {
     if (data && data.id) {
-      _hfDetail(data.id);
+      _hfDetail(data.id, data.repo_type || repoType);
     } else {
       _toast("Repo not found", "error");
     }
@@ -1462,8 +1471,9 @@ function _lookupHF(raw, fieldEl) {
   .then(function() { if (fieldEl) fieldEl.disabled = false; });
 }
 
-function _hfDetail(repoIdOrData) {
+function _hfDetail(repoIdOrData, repoType) {
   var repoId = typeof repoIdOrData === "string" ? repoIdOrData : (repoIdOrData.id || "");
+  repoType = repoType || (typeof repoIdOrData === "object" && repoIdOrData.repo_type) || "model";
   if (!repoId || repoId.indexOf("/") < 0) { _toast("Invalid repo ID", "error"); return; }
   var bg = el("div", { class: "cvt-modal-bg" });
   var wrap = el("div", { class: "cvt-modal-wrap" });
@@ -1480,7 +1490,7 @@ function _hfDetail(repoIdOrData) {
   left.appendChild(el("h2", { style: { color:"#ff8c42" } }, repoId));
   left.appendChild(el("div", { class: "sub" }, "Loading\u2026"));
 
-  _api("/civitai/hf-files?repo_id=" + encodeURIComponent(repoId)).then(function(info) {
+  _api("/civitai/hf-files?repo_id=" + encodeURIComponent(repoId) + "&repo_type=" + encodeURIComponent(repoType)).then(function(info) {
     var files = Array.isArray(info) ? info : info.siblings || [];
     var data = info.data || info;
     var pt = data.pipeline_tag || data.library_name || "?";
@@ -1572,6 +1582,7 @@ function _hfDetail(repoIdOrData) {
       statusLine.textContent = metadataOnly ? "Fetching metadata\u2026" : "Starting download\u2026";
       var body = {
         repo_id: repoId,
+        repo_type: repoType,
         revision: revIn.value.trim() || "main",
         path: path,
         save_as: folderSel.value || "auto",
@@ -1628,7 +1639,8 @@ function _hfDetail(repoIdOrData) {
           var name = fn.split("/").pop();
           var sf = subIn.value || "";
           var fldr = folderSel.value || "loras";
-          _startDl("https://huggingface.co/" + repoId + "/resolve/main/" + encodeURIComponent(fn), name, fldr + (sf ? "/" + sf : ""));
+          var seg = repoType === "dataset" ? "datasets/" : (repoType === "space" ? "spaces/" : "");
+          _startDl("https://huggingface.co/" + seg + repoId + "/resolve/main/" + encodeURIComponent(fn), name, fldr + (sf ? "/" + sf : ""));
         };
         rightSpan.appendChild(dlBtn2);
       }
@@ -1716,7 +1728,7 @@ function _pollDl() {
     // Adaptive heartbeat: only poll when visible and active
     if (_dlTimer) clearInterval(_dlTimer);
     if (_activeJobs > 0 && !document.hidden) {
-      _dlTimer = setInterval(_pollDl, 1500);
+      _dlTimer = setInterval(_pollDl, 500);
     } else {
       _dlTimer = null;
     }

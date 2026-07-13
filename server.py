@@ -389,11 +389,21 @@ async def start_download(request):
 
         def _download_blocking():
             nonlocal filename, save_path
+            req_headers = {"User-Agent": "Mozilla/5.0"}
+            api_key = utils.db_manager.get_setting("civitai_api_key")
+            if api_key and isinstance(api_key, str) and "civitai" in download_url:
+                req_headers["Authorization"] = f"Bearer {api_key}"
             req = urllib.request.Request(
                 download_url,
-                headers={"User-Agent": "Mozilla/5.0"},
+                headers=req_headers,
             )
             with urllib.request.urlopen(req, timeout=300) as resp:
+                content_type = (resp.headers.get("Content-Type") or "").lower()
+                if "text/html" in content_type:
+                    raise RuntimeError(
+                        "Civitai returned a login page instead of the model. "
+                        "This model requires authentication \u2014 set a valid Civitai API key in Settings."
+                    )
                 total = int(resp.headers.get("Content-Length", 0))
                 # Try to get real filename from Content-Disposition
                 cd = resp.headers.get("Content-Disposition", "")
@@ -890,6 +900,38 @@ async def auto_organize(request):
 
 # ── HF Browse ─────────────────────────────────────────────────────────
 
+def _parse_hf_repo(raw):
+    """Parse a HF repo identifier or URL into (repo_id, repo_type).
+
+    Handles models, datasets and spaces, full URLs, and trailing
+    /tree|/blob|/resolve path segments.
+    """
+    s = (raw or "").strip()
+    m = re.search(r'huggingface\.co/(.+)$', s)
+    if m:
+        s = m.group(1)
+    s = s.strip('/')
+    repo_type = "model"
+    tm = re.match(r'^(datasets|spaces|models)/(.+)$', s)
+    if tm:
+        repo_type = {"datasets": "dataset", "spaces": "space", "models": "model"}[tm.group(1)]
+        s = tm.group(2)
+    s = re.sub(r'/(tree|blob|resolve|blame|commits|discussions|files)/.*$', '', s).strip('/')
+    parts = [p for p in s.split('/') if p]
+    repo_id = f"{parts[0]}/{parts[1]}" if len(parts) >= 2 else s
+    return repo_id, repo_type
+
+
+def _hf_api_base(repo_id, repo_type):
+    seg = {"dataset": "datasets", "space": "spaces"}.get(repo_type)
+    return f"https://huggingface.co/api/{seg}/{repo_id}" if seg else f"https://huggingface.co/api/models/{repo_id}"
+
+
+def _hf_resolve_base(repo_id, repo_type):
+    seg = {"dataset": "datasets", "space": "spaces"}.get(repo_type)
+    return f"https://huggingface.co/{seg}/{repo_id}" if seg else f"https://huggingface.co/{repo_id}"
+
+
 @routes.get("/civitai/hf-search")
 async def hf_search(request):
     try:
@@ -934,46 +976,50 @@ async def hf_search(request):
 @routes.get("/civitai/hf-lookup")
 async def hf_lookup(request):
     try:
-        repo_id = request.query.get("repo", "")
-        if not repo_id:
+        raw = request.query.get("repo", "")
+        if not raw:
             return web.json_response({"error": "Missing repo"}, status=400)
-        # Server-side URL parsing as safety net
-        import re as _re
-        url_match = _re.search(r'huggingface\.co/([\w.-]+/[\w.-]+)', repo_id)
-        if url_match:
-            repo_id = url_match.group(1)
-        repo_id = _re.sub(r'/(tree|blob|resolve|blame|commits|discussions|files)/.*$', '', repo_id).strip('/')
+        repo_id, repo_type = _parse_hf_repo(raw)
         if repo_id.find("/") < 0:
             return web.json_response({"error": "Invalid repo format (use user/repo)"}, status=400)
         headers = {"User-Agent": "Mozilla/5.0"}
         token = utils.db_manager.get_setting("hf_token", "")
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        api_url = f"https://huggingface.co/api/models/{repo_id}"
         loop = asyncio.get_event_loop()
-        try:
-            resp = await loop.run_in_executor(
-                None, lambda: requests.get(api_url, timeout=15, headers=headers)
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return web.json_response(data)
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                # Fallback: try resolving a known file to check if repo exists
-                try:
-                    check_url = f"https://huggingface.co/{repo_id}/resolve/main/config.json"
-                    r2 = await loop.run_in_executor(
-                        None, lambda: requests.head(check_url, timeout=10, headers=headers, allow_redirects=True)
-                    )
-                    if r2.status_code < 400:
-                        return web.json_response({"id": repo_id, "gated": True})
-                except Exception:
-                    pass
-                return web.json_response({"error": f"Repo not found: {repo_id}. If gated, set HF token in Settings."}, status=404)
-            if e.response.status_code == 401:
-                return web.json_response({"error": "Unauthorized \u2014 set your HF token in Settings"}, status=401)
-            return web.json_response({"error": f"HTTP {e.response.status_code}"}, status=e.response.status_code)
+        # If type wasn't explicit in the input, try model then dataset then space.
+        candidates = [repo_type] if repo_type != "model" else ["model", "dataset", "space"]
+        last_error = None
+        for rt in candidates:
+            api_url = _hf_api_base(repo_id, rt)
+            try:
+                resp = await loop.run_in_executor(
+                    None, lambda u=api_url: requests.get(u, timeout=15, headers=headers)
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                data["repo_type"] = rt
+                data.setdefault("id", repo_id)
+                return web.json_response(data)
+            except requests.exceptions.HTTPError as e:
+                last_error = e
+                if e.response.status_code == 404:
+                    continue
+                if e.response.status_code == 401:
+                    # Gated/private: confirm existence via resolve, keep this type.
+                    try:
+                        check_url = f"{_hf_resolve_base(repo_id, rt)}/resolve/main/config.json"
+                        r2 = await loop.run_in_executor(
+                            None, lambda u=check_url: requests.head(u, timeout=10, headers=headers, allow_redirects=True)
+                        )
+                        if r2.status_code < 400:
+                            return web.json_response({"id": repo_id, "repo_type": rt, "gated": True})
+                    except Exception:
+                        pass
+                    return web.json_response({"error": "Unauthorized \u2014 set your HF token in Settings"}, status=401)
+                return web.json_response({"error": f"HTTP {e.response.status_code}"}, status=e.response.status_code)
+        # All candidates 404'd
+        return web.json_response({"error": f"Repo not found: {repo_id}. If gated, set HF token in Settings."}, status=404)
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
@@ -983,9 +1029,10 @@ async def hf_files(request):
     try:
         repo_id = request.query.get("repo_id", "")
         path = request.query.get("path", "")
+        repo_type = request.query.get("repo_type", "model")
         if not repo_id:
             return web.json_response({"error": "Missing repo_id"}, status=400)
-        api_url = f"https://huggingface.co/api/models/{repo_id}"
+        api_url = _hf_api_base(repo_id, repo_type)
         if path:
             api_url += f"/tree/{path}"
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -1190,6 +1237,7 @@ async def hf_download(request):
     try:
         body = await request.json()
         repo_id = body.get("repo_id", "")
+        repo_type = body.get("repo_type", "model")
         revision = body.get("revision", "main")
         path = body.get("path", "")
         save_as = body.get("save_as", "auto")
@@ -1213,7 +1261,7 @@ async def hf_download(request):
                 dest = os.path.join(dest_dir, f"{base_name}_{counter}{ext}")
                 counter += 1
             filename = os.path.basename(dest)
-        url = f"https://huggingface.co/{repo_id}/resolve/{revision}/{urllib.parse.quote(path, safe='/')}"
+        url = f"{_hf_resolve_base(repo_id, repo_type)}/resolve/{revision}/{urllib.parse.quote(path, safe='/')}"
         task_id = f"hf_{int(time.time())}_{hashlib.md5(f'{repo_id}:{path}'.encode()).hexdigest()[:8]}"
         DOWNLOAD_TASKS[task_id] = {
             "id": task_id, "url": url, "filename": filename,
